@@ -1,0 +1,4 @@
+host = 192.168.168.10
+username = bras1
+password = brpass
+database = stg

@@ -1,0 +1,47 @@
+set limit states 16000000
+set optimization aggressive
+set limit src-nodes 160000
+set limit table-entries 160000
+set skip on lo0
+
+
+
+
+#no lagg
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8877 -> 192.168.168.10 port 80
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8822 -> 192.168.168.10 port 22
+#rdr on em0 proto tcp from any to 31.41.108.3 port 42112 -> 192.168.168.10 port 42111
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8880 -> 192.168.168.235 port 80
+#rdr on em0 proto tcp from any to 31.41.108.3 port 443 -> 192.168.168.235 port 443
+#rdr on em0 proto tcp from 193.107.128.124 to 31.41.108.3 port 2222 -> 192.168.168.252 port 22
+#rdr on em0 proto tcp from 31.41.109.0/24 to 31.41.108.3 port 8383 -> 192.168.168.252 port 8006
+#rdr on em0 proto tcp from 31.41.109.0/24 to 31.41.108.3 port 8989 -> 192.168.168.2 port 8291
+#nat on em0 from <local1> to any -> 31.41.107.0/24 source-hash
+
+#prepare to lagg
+
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 8877 -> 192.168.168.10 port 80
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 8822 -> 192.168.168.10 port 22
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 8882 -> 192.168.168.5 port 22
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 42112 -> 192.168.168.10 port 42111
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 8880 -> 192.168.168.253 port 80
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 8292 -> 192.168.168.222 port 8292
+#rdr on vlan270 proto tcp from any to 31.41.108.3 port 443 -> 192.168.168.235 port 443
+rdr on vlan270 proto tcp from 193.107.128.124 to 85.115.202.3 port 2222 -> 192.168.168.252 port 22
+rdr on vlan270 proto tcp from 31.41.109.0/24 to 85.115.202.3 port 8383 -> 192.168.168.252 port 8006
+rdr on vlan270 proto tcp from 31.41.109.0/24 to 85.115.202.3 port 8989 -> 192.168.168.2 port 8291
+
+#nat on lagg1 from <local1> to any -> 31.41.107.0/24 source-hash
+#nat on lagg1 from <local1> to any -> 31.41.108.3/32 source-hash
+
+rdr on vlan270 proto tcp from any to 85.115.202.3 port 8122 -> 192.168.168.8 port 22
+
+#nat on lagg1 from <local1> to any -> 91.214.179.128/27 source-hash
+nat on vlan270 from <local1> to any -> 85.115.202.32/27 source-hash
+
+#nat on lagg1 from <local1> to any -> 31.41.108.3/32 source-hash
+
+table <local1> { 172.16.0.0/12, 192.168.0.0/16, 10.123.0.0/24 }
+
+
+

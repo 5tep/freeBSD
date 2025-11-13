@@ -1,0 +1,33 @@
+kldload pf.ko
+pfctl -e & pfctl -f /etc/pf.conf
+#dhclient em0
+#ifconfig em0 31.41.108.8 netmask 255.255.255.240 alias
+
+
+#xinetd -f /root/www.conf
+
+
+#no lagg
+#ipfw add 98 fwd 127.0.0.1,8877 tcp from 10.123.0.0/16 to not me dst-port 1-65535 in via em1
+#ifconfig em0 31.41.108.8 netmask 255.255.255.240 alias
+
+#prepare to lagg
+ipfw add 98 fwd 127.0.0.1,8877 ip from 10.123.0.0/16 to not me dst-port 1-65535 in via lagg0
+ifconfig lagg1 85.115.202.8 netmask 255.255.255.240 alias
+#ifconfig lagg1 alias 91.214.179.128 netmask 255.255.255.224
+ifconfig lagg1 alias 31.41.108.3 netmask 255.255.255.240
+
+/usr/local/sbin/xinetd -f /root/www.conf
+
+ipfw add 2 deny icmp from any to me
+#for {Va-DOS} test and Vania(BLIA)
+ipfw add 236 allow ip from any to 172.16.32.236,172.16.32.61
+ipfw add 236 allow ip from 172.16.32.236,172.16.32.61 to any
+  
+
+sysctl kern.ipc.nmbclusters=65536
+
+#/usr/local/bin/php /etc/rscriptd/debtors.php 
+#route add -net  91.214.179.0/29 10.10.10.1
+
+/usr/local/bin/php -q /etc/rscriptd/debtors.php

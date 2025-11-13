@@ -1,0 +1,70 @@
+hostname="bras"
+sshd_enable="YES"
+ntpd_enable="YES"
+# Set dumpdev to "AUTO" to enable crash dumps, "NO" to disable
+dumpdev="AUTO"
+# NAS custom
+firewall_enable="YES" 
+firewall_nat_enable="YES" 
+dummynet_enable="YES" 
+firewall_script="/etc/firewall.conf" 
+thttpd_enable="YES"
+snmpd_enable="YES" 
+snmpd_flags="-a" 
+snmpd_conffile="/usr/local/etc/snmpd.config" 
+nginx_enable="YES" 
+
+defaultrouter="85.115.202.1"
+
+lighttpd_enable="YES"
+
+pf_enable="YES"                  # Set to YES to enable packet filter (pf)
+pf_rules="/etc/pf.conf"         # rules definition file for pf
+pf_program="/sbin/pfctl"        # where the pfctl program lives
+
+
+
+cloned_interfaces="lagg0 lagg1 vlan270 vlan3100"
+
+ifconfig_igb0="-rxcsum -txcsum -tso -lro up" #local
+ifconfig_igb1="-rxcsum -txcsum -tso -lro up" #local
+ifconfig_igb2="-rxcsum -txcsum -tso -lro up" #inet
+ifconfig_igb3="-rxcsum -txcsum -tso -lro up" #inet
+
+ifconfig_lagg0="create" #local
+ifconfig_lagg0="up"
+
+ifconfig_lagg1="create" #INTERNET
+ifconfig_lagg1="up"
+
+ifconfig_vlan270="create"
+ifconfig_vlan270="up"
+
+ifconfig_vlan3100="create"
+ifconfig_vlan3100="up"
+
+ifconfig_lagg0="laggproto lacp laggport igb0 laggport igb1 10.10.10.10/24" #local
+#ifconfig_lagg1="laggproto lacp laggport igb2 laggport igb3 85.115.202.3/28" #INTERNET
+
+ifconfig_lagg1="laggproto lacp laggport igb2 laggport igb3" #INTERNET
+ifconfig_vlan270="inet 85.115.202.3/28 vlan 270 vlandev lagg1"
+ifconfig_vlan3100="inet 100.127.255.78/30 vlan 3100 vlandev lagg1"
+
+
+############## Static route##############
+static_routes="123 172 168 realip realip1 realip2"
+route_123="-net 10.123.0.0/21 10.10.10.1"
+route_172="-net 172.16.0.0/12 10.10.10.1"
+route_168="-net 192.168.0.0/16 10.10.10.1"
+route_realip="-net 91.214.179.0/29 10.10.10.1"
+route_realip1="-net 91.214.179.96/29 10.10.10.1"
+route_realip2="-net 31.41.108.16/28 10.10.10.1"
+
+
+ntpd_enable="YES"
+ntpdate_enable="YES"
+inetd_enable="YES" 
+
+
+bandwidthd_enable="YES"
+zabbix_agentd_enable="YES"

@@ -1,0 +1,31 @@
+#
+# default fcolor:bcolor
+#	- Set the default screen background color-pair
+#
+# port[/proto] fcolor:bcolor
+#	- Set color pattern by service port
+#
+# from[/mask][:port] to[/mask][:port] proto fcolor:bcolor
+#	- Set color pattern by pair of from-to addresses
+#
+# The wildcard `*' do match ANY in pattern
+# The colors are:
+#	black  red  green  yellow  blue  magenta  cyan  white
+#
+# The upper-case Fcolor mean bright *on* and Bcolor blink *on*
+#
+
+default	Yellow:blue
+
+#domain1.foo.bar domain2.foo.bar any black:white
+#127.0.0.128/26 any any black:white
+
+#telnet	green
+#login	Green	# rlogin service
+#smtp	White
+#pop3	white
+#ftp	:Red
+#ftp-data White:Red
+#domain	Blue
+#nntp	yellow:White	# actually brown
+#*/icmp	black:white

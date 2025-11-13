@@ -1,0 +1,77 @@
+##Optimization
+set limit states 16000000
+set optimization aggressive
+set limit src-nodes 160000
+set limit table-entries 160000
+set skip on lo0
+
+#Normal traf
+#scrub in  all
+#scrub out all
+
+
+
+rdr on em0 proto tcp from any to 31.41.108.3 port 8877 -> 192.168.168.10 port 80
+rdr on em0 proto tcp from any to 31.41.108.3 port 8822 -> 192.168.168.10 port 22
+
+#rdr on em0 proto tcp from any to 31.41.108.8 port 80 -> 192.168.168.10 port 80
+
+
+rdr on em0 proto tcp from any to 31.41.108.3 port 42112 -> 192.168.168.10 port 42111
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8291 -> 31.41.108.9 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 3350 -> 172.16.33.50 port 80
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8000 -> 172.16.32.243 port 8000
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8201 -> 192.168.168.101 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8202 -> 192.168.168.102 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 9999 -> 192.168.168.105 port 9999
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8203 -> 192.168.168.103 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8204 -> 192.168.168.104 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8206 -> 192.168.168.106 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8207 -> 192.168.168.107 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8205 -> 192.168.168.105 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7777 -> 192.168.168.103 port 7777
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7778 -> 192.168.168.103 port 7778
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7779 -> 192.168.168.103 port 7779
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7780 -> 192.168.168.103 port 7780
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7781 -> 192.168.168.103 port 7781
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7782 -> 192.168.168.103 port 7782
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7783 -> 192.168.168.103 port 7783
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7784 -> 192.168.168.103 port 7784
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7785 -> 192.168.168.103 port 7785
+#rdr on em0 proto tcp from any to 31.41.108.3 port 7786 -> 192.168.168.103 port 7786
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8209 -> 192.168.168.109 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 1022 -> 192.168.168.108 port 22
+#rdr on em0 proto tcp from any to 31.41.108.3 port 1023 -> 192.168.168.108 port 23
+#rdr on em0 proto tcp from any to 31.41.108.3 port 1080 -> 192.168.168.108 port 80
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8208 -> 192.168.168.108 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8211 -> 192.168.168.111 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8262 -> 192.168.168.152 port 8292
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8252 -> 192.168.168.152 port 8291
+#rdr on em0 proto tcp from any to 31.41.108.3 port 8292 -> 192.168.168.101 port 8292
+
+#rdr on em0 proto tcp from any to 31.41.108.3 port 1723 -> 192.168.168.2 port 1723
+
+#rdr on em0 proto tcp from any to 31.41.108.3 port 9933 -> 192.168.167.20 port 443
+#rdr on em0 proto tcp from any to 31.41.108.3 port 9898 -> 172.16.34.86 port 80
+#rdr on em0 proto tcp from any to 31.41.108.3 port 35567 -> 172.16.34.86 port 35567 
+#rdr on em0 proto tcp from any to 31.41.108.3 port 5730 -> 172.16.34.30 port 5730
+#rdr on em0 proto tcp from any to 31.41.108.3 port 16 -> 192.168.168.65  port 16
+rdr on em0 proto tcp from any to 31.41.108.3 port 8880 -> 192.168.168.235 port 80
+rdr on em0 proto tcp from any to 31.41.108.3 port 443 -> 192.168.168.235 port 443
+rdr on em0 proto tcp from 193.107.128.124 to 31.41.108.3 port 2222 -> 192.168.168.252 port 22
+rdr on em0 proto tcp from 31.41.109.0/24 to 31.41.108.3 port 8383 -> 192.168.168.252 port 8006
+#nat on em0 from 172.16.32.207 to any -> 31.41.108.3 
+rdr on em0 proto tcp from 31.41.109.0/24 to 31.41.108.3 port 8989 -> 192.168.168.2 port 8291
+
+nat on em0 from <local1> to any -> 31.41.107.0/24 source-hash
+
+
+#binat on em0 from 172.16.32.61 to any -> 31.41.107.10        
+#binat on em0 from 172.16.33.12 to any -> 31.41.107.12        
+#TRUE
+
+#nat on em0 from <local1> to any -> 31.41.108.3 
+
+
+table <local1> { 172.16.0.0/12, 192.168.0.0/16, 10.123.0.0/24 }
+
