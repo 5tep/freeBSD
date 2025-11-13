@@ -5,21 +5,36 @@ IP=$2
 CASH=$4
 ID=$3
 
-fwcmd="/sbin/ipfw -q"
+dncmd="/sbin/dnctl"
+pfcmd="/sbin/pfctl -q"
+#fwcmd="/sbin/ipfw -q"  // ИЗМЕНЕНО: Убрали, используем dnctl/pfctl
 
 # TIME FORMAT
 cur_date=`date \+\%Y.\%m.\%d`
 cur_time=`date \+\%H:\%M:\%S`
 
-# DELETE RULEZ FRO IPFW
-${fwcmd} pipe `expr $ID + 101` delete
-${fwcmd} pipe `expr $ID + 8101` delete
+# DELETE RULEZ FOR DUMMYSNET  // ИЗМЕНЕНО: Замена ipfw pipe на dnctl
+UP_PIPE=`expr $ID + 101`
+DOWN_PIPE=`expr $ID + 8101`
+/sbin/dnctl pipe ${UP_PIPE} delete
+/sbin/dnctl pipe ${DOWN_PIPE} delete
 
-${fwcmd} table 47 add $IP
+# ADD TO BLOCKED (table 47)  // ИЗМЕНЕНО: pfctl вместо ipfw
+/sbin/pfctl -t block_users -T add $IP
 
-${fwcmd} table 3 delete $IP
-${fwcmd} table 4 delete $IP
+# DELETE FROM SHAPER TABLES  // ИЗМЕНЕНО: pfctl вместо ipfw
+UPLOAD_TABLE="users_in"   # Аналог table(3)
+DOWNLOAD_TABLE="users_out"  # Аналог table(4)
+/sbin/pfctl -t ${UPLOAD_TABLE} -T delete $IP
+/sbin/pfctl -t ${DOWNLOAD_TABLE} -T delete $IP
 
+# Удаляем per-IP правила из PF anchor "shaper" (замена tablearg)  // ИЗМЕНЕНО: Новое — динамические no pass rules
+/sbin/pfctl -a shaper -fr /dev/stdin <<EOF
+no pass in quick on ix1 from $IP to ! ix1 dummynet pipe ${UP_PIPE}
+no pass out quick on vlan270 to $IP dummynet pipe ${DOWN_PIPE}
+EOF
+
+/sbin/pfctl -k $IP
 
 # DAY/NIGHT switcher
 /bin/rm /etc/stargazer/dn/$LOGIN

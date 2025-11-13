@@ -10,7 +10,10 @@ SPEED=`/etc/rscriptd/GetSpeed $LOGIN`
 UPSPEED=`/etc/rscriptd/GetUpSpeed $LOGIN`
 #MAC=`/etc/rscriptd/GetMac $LOGIN`
 SCOUNT="Kbit/s"
-fwcmd="/sbin/ipfw -q"
+
+dncmd="/sbin/dnctl"
+pfcmd="/sbin/pfctl -q"
+#fwcmd="/sbin/ipfw -q"  // ИЗМЕНЕНО: Убрали, используем dnctl/pfctl
 #arpcmd="/usr/sbin/arp"
 cur_date=`date \+\%Y.\%m.\%d`
 cur_time=`date \+\%H:\%M:\%S`
@@ -20,17 +23,31 @@ cur_time=`date \+\%H:\%M:\%S`
 #${arpcmd} -S $IP "${MAC}"
 
 #SPEED CONTROL
-${fwcmd} pipe `expr $ID + 101` config bw $UPSPEED$SCOUNT queue 32Kbytes
-${fwcmd} pipe `expr $ID + 8101` config bw $SPEED$SCOUNT queue 32Kbytes
+UP_PIPE=`expr $ID + 101`
+DOWN_PIPE=`expr $ID + 8101`
+${dncmd} pipe ${UP_PIPE} config bw $UPSPEED$SCOUNT queue 32Kbytes
+${dncmd} pipe ${DOWN_PIPE} config bw $SPEED$SCOUNT queue 32Kbytes
 
-${fwcmd} table 47 delete $IP
+# Удаляем из blocked (table 47)  // ИЗМЕНЕНО: pfctl вместо ipfw
+BLOCKED_TABLE="block_users"  # Аналог table(47)
+${pfcmd} -t ${BLOCKED_TABLE} -T delete $IP
 
-#new shaper
-${fwcmd} table 3 add $IP `expr $ID + 101`
-${fwcmd} table 4 add $IP `expr $ID + 8101`
+#new shaper  // ИЗМЕНЕНО: Добавляем IP в PF tables (только IP, без pipe-ID; attach ниже)
+UPLOAD_TABLE="users_in"   # Аналог table(3)
+DOWNLOAD_TABLE="users_out"  # Аналог table(4)
+${pfcmd} -t ${UPLOAD_TABLE} -T add $IP
+${pfcmd} -t ${DOWNLOAD_TABLE} -T add $IP
+
+# Attach per-IP правила в PF anchor "shaper" (замена tablearg)  // ИЗМЕНЕНО: Новое — динамические pass rules
+${pfcmd} -a shaper -fr /dev/stdin <<EOF
+pass in quick on ix1 from $IP to ! ix1 dummynet pipe ${UP_PIPE}
+pass out quick on vlan270 to $IP dummynet pipe ${DOWN_PIPE}
+EOF
+
+${pfcmd} -k $IP
 
 # DAY/NIGHT switcher
-/bin/echo $SPEED:`expr $ID + 8101` > /etc/stargazer/dn/$LOGIN
+/bin/echo $SPEED:${DOWN_PIPE} > /etc/stargazer/dn/$LOGIN
 /bin/chmod 777 /etc/stargazer/dn/$LOGIN
 
 # ADD TO LOG

@@ -142,7 +142,7 @@ function dshape_GetTimeRules() {
  * @return void
  */
 function dshape_SwitchSpeed($speed, $mark, $speed_size = 'Kbit/s') {
-    $shape_command = '/sbin/ipfw -q pipe ' . trim($mark) . ' config bw ' . $speed . '' . $speed_size . ' queue 32Kbytes' . "\n";
+    $shape_command = '/sbin/dnctl pipe ' . trim($mark) . ' config bw ' . $speed . '' . $speed_size . ' queue 32Kbytes' . "\n";
     shell_exec($shape_command);
 }
 
