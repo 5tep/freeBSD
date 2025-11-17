@@ -1,8 +1,13 @@
 #!/bin/sh
 # /etc/rc.local — Упрощённый для PF 14.2 (миграция с IPFW)
 # Только custom: alias IP, xinetd, sysctl, debtors.php, netflow (опционально)
+ifconfig re0 up
+ifconfig vlan4000 create
+ifconfig vlan4000 vlan 4000 vlandev re0
+ifconfig inet 192.168.168.9/24
 
 # Доп. IP на WAN (vlan270)
+
 ifconfig vlan270 85.115.202.8 netmask 255.255.255.240 alias
 
 # Custom xinetd (есть inetd_enable=YES в rc.conf )
