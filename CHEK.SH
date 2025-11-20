@@ -32,3 +32,11 @@ MTU: ping -M do -s 8972 85.115.202.1 (для 9000 MTU; если фрагмент
 PF: pfctl -sr (правила), добавь тестового юзера — проверь shaping на ix1 → vlan270.
 
 service netif restart
+
+
+cloned_interfaces="vlan270 vlan4050"  # Только VLAN на ix0 (WAN)
+ifconfig_ix0="-rxcsum -txcsum -tso -lro mtu 9000 up"  # WAN 10G
+ifconfig_ix1="-rxcsum -txcsum -tso -lro mtu 9000 inet 10.10.10.10/24 up"  # LAN 10G (пользователи)
+ifconfig_vlan270="vlan 270 vlandev ix0 inet 85.115.202.3/28 up"
+ifconfig_vlan4050="vlan 4050 vlandev ix0 inet 172.31.255.2/24 up"
+
