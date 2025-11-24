@@ -1,0 +1,2 @@
+pass in quick on ix1 from 192.168.1.100 to any dummynet 224
+pass out quick on vlan270 to 192.168.1.100 dummynet 8224

@@ -1,0 +1,15 @@
+# /tmp/test.rule — CBQ, окончательный вариант, работает везде
+altq on ix1     cbq bandwidth 1000Mb queue { main_lan, user_up }
+altq on vlan270 cbq bandwidth 1000Mb queue { main_wan, user_down }
+
+# Одна обязательная default-очередь на каждый интерфейс
+queue main_lan  bandwidth 99% cbq(default borrow)
+queue main_wan  bandwidth 99% cbq(default borrow)
+
+# Очереди для тестового пользователя
+queue user_up   bandwidth 1Mb  cbq(borrow) qlimit 500
+queue user_down bandwidth 5Mb  cbq(borrow) qlimit 500
+
+# Правила шейпинга
+pass in  quick on ix1     from 192.168.1.100 to any  queue user_up
+pass out quick on vlan270 to   192.168.1.100       queue user_down
