@@ -7,38 +7,54 @@ ID=$3
 
 dncmd="/sbin/dnctl"
 pfcmd="/sbin/pfctl -q"
-#fwcmd="/sbin/ipfw -q"  // ИЗМЕНЕНО: Убрали, используем dnctl/pfctl
+fwcmd="/sbin/ipfw -q"  # ВКЛЮЧЕНО: Используем IPFW для удаления правил
 
 # TIME FORMAT
-cur_date=`date \+\%Y.\%m.\%d`
-cur_time=`date \+\%H:\%M:\%S`
+cur_date=`date +\%Y.\%m.\%d`
+cur_time=`date +\%H:\%M:\%S`
 
-# DELETE RULEZ FOR DUMMYSNET  // ИЗМЕНЕНО: Замена ipfw pipe на dnctl
+# Удаляем правила шейпинга IPFW
 UP_PIPE=`expr $ID + 101`
 DOWN_PIPE=`expr $ID + 8101`
-/sbin/dnctl pipe ${UP_PIPE} delete
-/sbin/dnctl pipe ${DOWN_PIPE} delete
 
-# ADD TO BLOCKED (table 47)  // ИЗМЕНЕНО: pfctl вместо ipfw
-/sbin/pfctl -t block_users -T add $IP
+echo "Removing IPFW rules and pipes for user $LOGIN ($IP)"
 
-# DELETE FROM SHAPER TABLES  // ИЗМЕНЕНО: pfctl вместо ipfw
-UPLOAD_TABLE="users_in"   # Аналог table(3)
-DOWNLOAD_TABLE="users_out"  # Аналог table(4)
-/sbin/pfctl -t ${UPLOAD_TABLE} -T delete $IP
-/sbin/pfctl -t ${DOWNLOAD_TABLE} -T delete $IP
+# Удаляем правила IPFW для этого IP
+# Находим и удаляем все правила, связанные с этим IP и pipes
+RULES_TO_DELETE=$(${fwcmd} show | grep -E "($IP|pipe ${UP_PIPE}|pipe ${DOWN_PIPE})" | awk '{print $1}' | tr '\n' ' ')
 
-# Удаляем per-IP правила из PF anchor "shaper" (замена tablearg)  // ИЗМЕНЕНО: Новое — динамические no pass rules
-/sbin/pfctl -a shaper -fr /dev/stdin <<EOF
-no pass in quick on ix1 from $IP to ! ix1 dummynet pipe ${UP_PIPE}
-no pass out quick on vlan270 to $IP dummynet pipe ${DOWN_PIPE}
-EOF
+if [ -n "$RULES_TO_DELETE" ]; then
+    for rule_num in $RULES_TO_DELETE; do
+        echo "Deleting rule $rule_num"
+        ${fwcmd} delete $rule_num 2>/dev/null || true
+    done
+else
+    echo "No specific rules found for IP $IP"
+fi
 
-/sbin/pfctl -k $IP
+# Удаляем pipes
+${dncmd} pipe delete ${UP_PIPE} 2>/dev/null || true
+${dncmd} pipe delete ${DOWN_PIPE} 2>/dev/null || true
+
+# Управление PF таблицами
+echo "Updating PF tables for user $LOGIN ($IP)"
+
+# Добавляем в blocked
+${pfcmd} -t block_users -T add $IP
+
+# Удаляем из шейпинг таблиц
+UPLOAD_TABLE="users_in"
+DOWNLOAD_TABLE="users_out"
+${pfcmd} -t ${UPLOAD_TABLE} -T delete $IP 2>/dev/null || true
+${pfcmd} -t ${DOWNLOAD_TABLE} -T delete $IP 2>/dev/null || true
+
+# Принудительное обновление состояний PF
+${pfcmd} -k $IP 2>/dev/null || true
 
 # DAY/NIGHT switcher
-/bin/rm /etc/stargazer/dn/$LOGIN
+rm -f /etc/stargazer/dn/$LOGIN
 
+# ADD TO LOG
+echo "$cur_date $cur_time DISCONNECT: ID-$ID;LOGIN-$LOGIN;IP-$IP;CASH-$CASH" >> /var/stargazer/alldisconnect.log
 
-echo "$cur_date $cur_time DISCONNECT: ID-$ID;LOGIN-$LOGIN;IP-$IP;CASH-$CASH" >> /var/stargazer/allconnect.log
-
+echo "SUCCESS: User $LOGIN ($IP) disconnected and blocked"

@@ -5,51 +5,68 @@ IP=$2
 CASH=$4
 ID=$3
 
-
-SPEED=`/etc/rscriptd/GetSpeed $LOGIN`
-UPSPEED=`/etc/rscriptd/GetUpSpeed $LOGIN`
-#MAC=`/etc/rscriptd/GetMac $LOGIN`
+#SPEED=`/etc/rscriptd/GetSpeed $LOGIN`
+#UPSPEED=`/etc/rscriptd/GetUpSpeed $LOGIN`
+SPEED=50
+UPSPEED=100
 SCOUNT="Kbit/s"
 
 dncmd="/sbin/dnctl"
 pfcmd="/sbin/pfctl -q"
-#fwcmd="/sbin/ipfw -q"  // ИЗМЕНЕНО: Убрали, используем dnctl/pfctl
-#arpcmd="/usr/sbin/arp"
-cur_date=`date \+\%Y.\%m.\%d`
-cur_time=`date \+\%H:\%M:\%S`
+fwcmd="/sbin/ipfw -q"
+cur_date=`date +\%Y.\%m.\%d`
+cur_time=`date +\%H:\%M:\%S`
 
+# Проверка что скорости получены корректно
+if [ -z "$SPEED" ] || [ -z "$UPSPEED" ]; then
+    echo "ERROR: Cannot get speed for login $LOGIN" >&2
+    exit 1
+fi
 
-# fix user mac to ip
-#${arpcmd} -S $IP "${MAC}"
+# Убираем возможные ошибки из значений скоростей
+SPEED=$(echo $SPEED | sed 's/[^0-9]//g')
+UPSPEED=$(echo $UPSPEED | sed 's/[^0-9]//g')
 
-#SPEED CONTROL
+# fix user mac to ip (если нужно)
+# /usr/sbin/arp -S $IP "${MAC}"
+
+# SPEED CONTROL
 UP_PIPE=`expr $ID + 101`
 DOWN_PIPE=`expr $ID + 8101`
-${dncmd} pipe ${UP_PIPE} config bw $UPSPEED$SCOUNT queue 32Kbytes
-${dncmd} pipe ${DOWN_PIPE} config bw $SPEED$SCOUNT queue 32Kbytes
 
-# Удаляем из blocked (table 47)  // ИЗМЕНЕНО: pfctl вместо ipfw
-BLOCKED_TABLE="block_users"  # Аналог table(47)
-${pfcmd} -t ${BLOCKED_TABLE} -T delete $IP
+# Удаляем старые правила для этого IP (чтобы избежать дублирования)
+${fwcmd} delete ip from $IP to any 2>/dev/null || true
+${fwcmd} delete ip from any to $IP 2>/dev/null || true
 
-#new shaper  // ИЗМЕНЕНО: Добавляем IP в PF tables (только IP, без pipe-ID; attach ниже)
-UPLOAD_TABLE="users_in"   # Аналог table(3)
-DOWNLOAD_TABLE="users_out"  # Аналог table(4)
+# Удаляем старые pipes (если существуют)
+${dncmd} pipe delete ${UP_PIPE} 2>/dev/null || true
+${dncmd} pipe delete ${DOWN_PIPE} 2>/dev/null || true
+
+# Создаем новые pipes
+${dncmd} pipe ${UP_PIPE} config bw ${UPSPEED}${SCOUNT} queue 32Kbytes
+${dncmd} pipe ${DOWN_PIPE} config bw ${SPEED}${SCOUNT} queue 32Kbytes
+
+# ШЕЙПИНГ через IPFW
+${fwcmd} add pipe ${UP_PIPE} ip from $IP to any out xmit ix1
+${fwcmd} add pipe ${DOWN_PIPE} ip from any to $IP in recv vlan270
+
+# Управление PF таблицами
+BLOCKED_TABLE="block_users"
+${pfcmd} -t ${BLOCKED_TABLE} -T delete $IP 2>/dev/null || true
+
+UPLOAD_TABLE="users_in"
+DOWNLOAD_TABLE="users_out"
 ${pfcmd} -t ${UPLOAD_TABLE} -T add $IP
 ${pfcmd} -t ${DOWNLOAD_TABLE} -T add $IP
 
-# Attach per-IP правила в PF anchor "shaper" (замена tablearg)  // ИЗМЕНЕНО: Новое — динамические pass rules
-${pfcmd} -a shaper -fr /dev/stdin <<EOF
-pass in quick on ix1 from $IP to ! ix1 dummynet pipe ${UP_PIPE}
-pass out quick on vlan270 to $IP dummynet pipe ${DOWN_PIPE}
-EOF
-
+# Принудительное обновление состояний PF
 ${pfcmd} -k $IP
 
 # DAY/NIGHT switcher
-/bin/echo $SPEED:${DOWN_PIPE} > /etc/stargazer/dn/$LOGIN
-/bin/chmod 777 /etc/stargazer/dn/$LOGIN
+echo "${SPEED}:${DOWN_PIPE}" > /etc/stargazer/dn/$LOGIN
+chmod 666 /etc/stargazer/dn/$LOGIN
 
 # ADD TO LOG
-#echo "$cur_date $cur_time CONNECT: ID-$ID;LOGIN-$LOGIN;IP-$IP;CASH-$CASH;SPEED-$SPEED;UPSPEED-$UPSPEED,MAC-$MAC" >> /var/stargazer/allconnect.log
 echo "$cur_date $cur_time CONNECT: ID-$ID;LOGIN-$LOGIN;IP-$IP;CASH-$CASH;SPEED-$SPEED;UPSPEED-$UPSPEED" >> /var/stargazer/allconnect.log
+
+echo "SUCCESS: User $LOGIN ($IP) connected with speed ${SPEED}Kbit/s down, ${UPSPEED}Kbit/s up"
