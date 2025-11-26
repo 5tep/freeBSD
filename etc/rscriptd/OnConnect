@@ -5,10 +5,9 @@ IP=$2
 CASH=$4
 ID=$3
 
-#SPEED=`/etc/rscriptd/GetSpeed $LOGIN`
-#UPSPEED=`/etc/rscriptd/GetUpSpeed $LOGIN`
-SPEED=50
-UPSPEED=100
+SPEED=`/etc/rscriptd/GetSpeed $LOGIN`
+UPSPEED=`/etc/rscriptd/GetUpSpeed $LOGIN`
+
 SCOUNT="Kbit/s"
 
 dncmd="/sbin/dnctl"
