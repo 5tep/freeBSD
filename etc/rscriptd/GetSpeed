@@ -1,19 +1,43 @@
 #!/usr/local/bin/php
 <?php
-$login=$argv[1];
-include('mysql.php');
-$query = 'SELECT `speed` FROM `userspeeds` where `login`= "'.$login.'"';
-$result = DB_query($query);
-while ($line = DB_fetch_array($result)) {
-    $col_value = $line['speed'];
-if ($col_value) {
- print ($col_value);
-  } else {
- $tarq='SELECT `speeddown` from `speeds` INNER JOIN (SELECT `Tariff` FROM users WHERE `login`="'.$login.'") AS t_u USING (`Tariff`)';
- $tar=DB_query($tarq);
-           while ($line2 = DB_fetch_array($tar)) {
-                $speedval = $line2['speeddown'];
- print($speedval);
-                        }
-  }
+
+if ($argc < 2) {
+    fwrite(STDERR, "Usage: php " . $argv[0] . " <login>\n");
+    exit(1);
 }
+
+$login = $argv[1];
+include('mysql.php');
+
+// Экранируем входные данные
+$login_safe = DB_real_escape_string($login);
+
+// Запрос индивидуальной скорости
+$query = "SELECT `speed` FROM `userspeeds` WHERE `login` = '$login_safe'";
+$result = DB_query($query);
+
+if ($result) {
+    $line = DB_fetch_array($result);
+    if ($line && !empty($line['speed'])) {
+        echo $line['speed'] . "\n";
+        exit(0);
+    }
+}
+
+// Если индивидуальной скорости нет — берём из тарифа
+$tariff_query = "
+    SELECT s.`speeddown`
+    FROM `speeds` s
+    INNER JOIN `users` u ON s.`Tariff` = u.`Tariff`
+    WHERE u.`login` = '$login_safe'
+";
+
+$tar = DB_query($tariff_query);
+if ($tar) {
+    while ($line2 = DB_fetch_array($tar)) {
+        if (!empty($line2['speeddown'])) {
+            echo $line2['speeddown'] . "\n";
+        }
+    }
+}
+?>

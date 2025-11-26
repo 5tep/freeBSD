@@ -1,16 +1,33 @@
 #!/usr/local/bin/php
 <?php
-$login=$argv[1];
-$cfid=$argv[2];
-$config=parse_ini_file(dirname(__FILE__)."/config");
-$link = mysql_connect($config['host'], $config['username'], $config['password']);
-mysql_select_db($config['database']);
-$ipq='SELECT `content` FROM `cfitems` WHERE `login`="'.$login.'" AND `typeid`="'.$cfid.'"';
-$ip=mysql_query($ipq);
-           while ($line2 = mysql_fetch_array($ip, MYSQL_ASSOC)) {
-                foreach($line2 as $ipval) {
-                                   print($ipval);
-                           }    
-                        }
 
-?>
+if ($argc < 3) {
+    fwrite(STDERR, "Usage: " . $argv[0] . " <login> <cfid>\n");
+    exit(1);
+}
+
+$login = $argv[1];
+$cfid  = $argv[2];
+
+// Подключаем единый файл с подключением к БД
+require_once __DIR__ . '/mysql.php';
+
+global $loginDB;
+
+// Подготовленный запрос — безопасен от SQL-инъекций
+$stmt = $loginDB->prepare('SELECT `content` FROM `cfitems` WHERE `login` = ? AND `typeid` = ?');
+if (!$stmt) {
+    fwrite(STDERR, "Prepare failed: " . $loginDB->error . "\n");
+    exit(1);
+}
+
+$stmt->bind_param('ss', $login, $cfid);
+$stmt->execute();
+$result = $stmt->get_result();
+
+while ($row = $result->fetch_assoc()) {
+    echo $row['content'] . "\n";
+}
+
+$stmt->close();
+// Подключение $loginDB остаётся активным — это нормально для CLI

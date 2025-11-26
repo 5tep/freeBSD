@@ -1,21 +1,48 @@
 #!/usr/local/bin/php
 <?php
-$login=$argv[1];
-$config=parse_ini_file(dirname(__FILE__)."/config");
-$link = mysql_connect($config['host'], $config['username'], $config['password']);
-mysql_select_db($config['database']);
-$ipq='SELECT `IP` FROM `users` WHERE `login`="'.$login.'"';
-$ip=mysql_query($ipq);
-           while ($line2 = mysql_fetch_array($ip, MYSQL_ASSOC)) {
-                foreach($line2 as $ipval) {
-                                $macq='SELECT `mac` from `nethosts` WHERE `ip`="'.$ipval.'"';
-                                $mac=mysql_query($macq);
-                                   while ($line3 = mysql_fetch_array($mac, MYSQL_ASSOC)) {
-                                   foreach($line3 as $macval) {
-                                   print($macval);
-                                   }
-                                  }
-                           }    
-                        }
 
-?>
+if ($argc < 2) {
+    fwrite(STDERR, "Usage: " . $argv[0] . " <login>\n");
+    exit(1);
+}
+
+$login = $argv[1];
+require_once __DIR__ . '/mysql.php';
+
+// Используем глобальное подключение из mysql.php
+global $loginDB;
+
+// 1. Получаем IP по login
+$stmt1 = $loginDB->prepare('SELECT `IP` FROM `users` WHERE `login` = ?');
+if (!$stmt1) {
+    fwrite(STDERR, "Prepare failed (users): " . $loginDB->error . "\n");
+    exit(1);
+}
+
+$stmt1->bind_param('s', $login);
+$stmt1->execute();
+$result1 = $stmt1->get_result();
+
+// 2. Для каждого IP ищем MAC
+while ($row1 = $result1->fetch_assoc()) {
+    $ip = $row1['IP'];
+
+    $stmt2 = $loginDB->prepare('SELECT `mac` FROM `nethosts` WHERE `ip` = ?');
+    if (!$stmt2) {
+        fwrite(STDERR, "Prepare failed (nethosts): " . $loginDB->error . "\n");
+        continue;
+    }
+
+    $stmt2->bind_param('s', $ip);
+    $stmt2->execute();
+    $result2 = $stmt2->get_result();
+
+    while ($row2 = $result2->fetch_assoc()) {
+        echo $row2['mac'] . "\n";
+    }
+
+    $stmt2->close();
+}
+
+$stmt1->close();
+// Подключение остаётся открытым, но это нормально для CLI-скрипта
