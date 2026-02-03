@@ -1,60 +1,66 @@
 #!/bin/sh
 
+# Входящие параметры
 LOGIN=$1
 IP=$2
-CASH=$4
 ID=$3
+CASH=$4
 
+# Пути к утилитам
 dncmd="/sbin/dnctl"
-pfcmd="/sbin/pfctl -q"
-fwcmd="/sbin/ipfw -q"  # ВКЛЮЧЕНО: Используем IPFW для удаления правил
+pfcmd="/sbin/pfctl"
 
-# TIME FORMAT
-cur_date=`date +\%Y.\%m.\%d`
-cur_time=`date +\%H:\%M:\%S`
-
-# Удаляем правила шейпинга IPFW
+# Вычисляем номера пайпов (как в OnConnect)
 UP_PIPE=`expr $ID + 101`
 DOWN_PIPE=`expr $ID + 8101`
 
-echo "Removing IPFW rules and pipes for user $LOGIN ($IP)"
+# Логирование времени
+cur_date=`date +%Y.%m.%d`
+cur_time=`date +%H:%M:%S`
 
-# Удаляем правила IPFW для этого IP
-# Находим и удаляем все правила, связанные с этим IP и pipes
-RULES_TO_DELETE=$(${fwcmd} show | grep -E "($IP|pipe ${UP_PIPE}|pipe ${DOWN_PIPE})" | awk '{print $1}' | tr '\n' ' ')
+echo "Disconnecting user $LOGIN ($IP)..."
 
-if [ -n "$RULES_TO_DELETE" ]; then
-    for rule_num in $RULES_TO_DELETE; do
-        echo "Deleting rule $rule_num"
-        ${fwcmd} delete $rule_num 2>/dev/null || true
-    done
-else
-    echo "No specific rules found for IP $IP"
-fi
+# ==========================================================
+# 1. Удаление правил фильтрации (PF)
+# ==========================================================
+# В новой схеме мы создавали персональный якорь для пользователя.
+# Нам нужно просто очистить его содержимое. Это удалит правило pass.
+${pfcmd} -a ubilling/${LOGIN} -F all 2>/dev/null
 
-# Удаляем pipes
-${dncmd} pipe delete ${UP_PIPE} 2>/dev/null || true
-${dncmd} pipe delete ${DOWN_PIPE} 2>/dev/null || true
+# ==========================================================
+# 2. Удаление шейпера (Dummynet/dnctl)
+# ==========================================================
+# Удаляем сами трубы. Правила ipfw искать не нужно, их нет.
+${dncmd} pipe delete ${UP_PIPE} 2>/dev/null
+${dncmd} pipe delete ${DOWN_PIPE} 2>/dev/null
 
-# Управление PF таблицами
-echo "Updating PF tables for user $LOGIN ($IP)"
+# ==========================================================
+# 3. Управление таблицами PF
+# ==========================================================
 
-# Добавляем в blocked
-${pfcmd} -t block_users -T add $IP
+# Добавляем в список должников/заблокированных (чтобы сработал rdr на заглушку)
+${pfcmd} -t block_users -T add $IP 2>/dev/null
 
-# Удаляем из шейпинг таблиц
-UPLOAD_TABLE="users_in"
-DOWNLOAD_TABLE="users_out"
-${pfcmd} -t ${UPLOAD_TABLE} -T delete $IP 2>/dev/null || true
-${pfcmd} -t ${DOWNLOAD_TABLE} -T delete $IP 2>/dev/null || true
+# Удаляем из списков активных (если вы их используете для совместимости)
+${pfcmd} -t users_in -T delete $IP 2>/dev/null
+${pfcmd} -t users_out -T delete $IP 2>/dev/null
 
-# Принудительное обновление состояний PF
-${pfcmd} -k $IP 2>/dev/null || true
+# ==========================================================
+# 4. Сброс соединений
+# ==========================================================
+# Убиваем все активные состояния (states) для этого IP, 
+# чтобы пользователь не мог докачивать файлы по старым соединениям.
+${pfcmd} -k $IP 2>/dev/null    # Kill states by source IP
+${pfcmd} -k 0.0.0.0/0 -k $IP 2>/dev/null # Kill states by dest IP
 
-# DAY/NIGHT switcher
+# ==========================================================
+# 5. Очистка файлов Ubilling
+# ==========================================================
 rm -f /etc/stargazer/dn/$LOGIN
 
-# ADD TO LOG
+# ==========================================================
+# 6. Логирование
+# ==========================================================
 echo "$cur_date $cur_time DISCONNECT: ID-$ID;LOGIN-$LOGIN;IP-$IP;CASH-$CASH" >> /var/stargazer/alldisconnect.log
 
-echo "SUCCESS: User $LOGIN ($IP) disconnected and blocked"
+echo "SUCCESS: User $LOGIN ($IP) disconnected, anchor flushed, pipes deleted."
