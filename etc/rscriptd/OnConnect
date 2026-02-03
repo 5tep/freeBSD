@@ -1,71 +1,57 @@
 #!/bin/sh
 
+# Входящие параметры от Ubilling/Stargazer
 LOGIN=$1
 IP=$2
-CASH=$4
 ID=$3
+CASH=$4
 
+# Настройки интерфейса клиентов (NAS)
+# ВАЖНО: Укажите интерфейс, к которому подключены клиенты
+CLIENT_IF="em1"
+
+# Получение скоростей (логика осталась прежней)
 SPEED=`/etc/rscriptd/GetSpeed $LOGIN`
 UPSPEED=`/etc/rscriptd/GetUpSpeed $LOGIN`
 
-SCOUNT="Kbit/s"
+# Идентификаторы пайпов (как в старом скрипте)
+PIPE_IN=`expr $ID + 101`    # Входящая для юзера (Download)
+PIPE_OUT=`expr $ID + 8101`  # Исходящая от юзера (Upload)
 
-dncmd="/sbin/dnctl"
-pfcmd="/sbin/pfctl -q"
-fwcmd="/sbin/ipfw -q"
-cur_date=`date +\%Y.\%m.\%d`
-cur_time=`date +\%H:\%M:\%S`
+# Логирование (дата/время)
+cur_date=`date +%Y.%m.%d`
+cur_time=`date +%H:%M:%S`
 
-# Проверка что скорости получены корректно
-if [ -z "$SPEED" ] || [ -z "$UPSPEED" ]; then
-    echo "ERROR: Cannot get speed for login $LOGIN" >&2
-    exit 1
-fi
+# 1. Настройка пайпов через dnctl (аналог ipfw pipe config)
+# FreeBSD 14 использует dnctl для управления dummynet без ipfw правил
+# Настраиваем Upload
+/sbin/dnctl pipe ${PIPE_OUT} config bw ${UPSPEED}Kbit/s queue 32Kbytes
+# Настраиваем Download
+/sbin/dnctl pipe ${PIPE_IN} config bw ${SPEED}Kbit/s queue 32Kbytes
 
-# Убираем возможные ошибки из значений скоростей
-SPEED=$(echo $SPEED | sed 's/[^0-9]//g')
-UPSPEED=$(echo $UPSPEED | sed 's/[^0-9]//g')
+# 2. Формирование правила для PF
+# Мы используем 'dnpipe (IN, OUT)'. 
+# Для входящего на интерфейс трафика (от юзера) -> первый аргумент.
+# Для исходящего с интерфейса (к юзеру) -> второй аргумент.
+# В PF правило применяется к интерфейсу.
+# pass in on $CLIENT_IF from $IP ... dnpipe ($PIPE_OUT, $PIPE_IN)
+# Примечание: dnpipe(X, Y) -> X=inbound bandwidth (upload), Y=outbound bandwidth (download)
 
-# fix user mac to ip (если нужно)
-# /usr/sbin/arp -S $IP "${MAC}"
+PFRULE="pass quick on ${CLIENT_IF} inet from ${IP} to any dnpipe (${PIPE_OUT}, ${PIPE_IN})"
 
-# SPEED CONTROL
-UP_PIPE=`expr $ID + 101`
-DOWN_PIPE=`expr $ID + 8101`
+# 3. Загрузка правила в персональный якорь пользователя
+# Это позволяет удалять/менять правила юзера, не трогая остальных
+echo "${PFRULE}" | /sbin/pfctl -a ubilling/${LOGIN} -f -
 
-# Удаляем старые правила для этого IP (чтобы избежать дублирования)
-${fwcmd} delete ip from $IP to any 2>/dev/null || true
-${fwcmd} delete ip from any to $IP 2>/dev/null || true
+# 4. (Опционально) Работа с таблицами
+# В старом скрипте было удаление из table 47 (блокировка) и добавление в разрешенные.
+# В PF можно использовать таблицы для общих списков.
+# /sbin/pfctl -t users_active -T add ${IP}
+# /sbin/pfctl -t users_blocked -T delete ${IP}
 
-# Удаляем старые pipes (если существуют)
-${dncmd} pipe delete ${UP_PIPE} 2>/dev/null || true
-${dncmd} pipe delete ${DOWN_PIPE} 2>/dev/null || true
+# 5. Day/Night switcher (из старого скрипта)
+/bin/echo $SPEED:${PIPE_IN} > /etc/stargazer/dn/$LOGIN
+/bin/chmod 777 /etc/stargazer/dn/$LOGIN
 
-# Создаем новые pipes
-${dncmd} pipe ${UP_PIPE} config bw ${UPSPEED}${SCOUNT} queue 32Kbytes
-${dncmd} pipe ${DOWN_PIPE} config bw ${SPEED}${SCOUNT} queue 32Kbytes
-
-# ШЕЙПИНГ через IPFW
-${fwcmd} add pipe ${UP_PIPE} ip from $IP to any out xmit ix1
-${fwcmd} add pipe ${DOWN_PIPE} ip from any to $IP in recv vlan270
-
-# Управление PF таблицами
-BLOCKED_TABLE="block_users"
-${pfcmd} -t ${BLOCKED_TABLE} -T delete $IP 2>/dev/null || true
-
-UPLOAD_TABLE="users_in"
-DOWNLOAD_TABLE="users_out"
-${pfcmd} -t ${UPLOAD_TABLE} -T add $IP
-${pfcmd} -t ${DOWNLOAD_TABLE} -T add $IP
-
-# Принудительное обновление состояний PF
-${pfcmd} -k $IP
-
-# DAY/NIGHT switcher
-echo "${SPEED}:${DOWN_PIPE}" > /etc/stargazer/dn/$LOGIN
-chmod 666 /etc/stargazer/dn/$LOGIN
-
-# ADD TO LOG
+# 6. Логирование
 echo "$cur_date $cur_time CONNECT: ID-$ID;LOGIN-$LOGIN;IP-$IP;CASH-$CASH;SPEED-$SPEED;UPSPEED-$UPSPEED" >> /var/stargazer/allconnect.log
-
-echo "SUCCESS: User $LOGIN ($IP) connected with speed ${SPEED}Kbit/s down, ${UPSPEED}Kbit/s up"
